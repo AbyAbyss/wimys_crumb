@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    wimys_crumb app icon — master 1024×1024 source.
+    Render to the macOS AppIcon set via scripts/generate_icons.sh.
+
+    Design source: the brand mark in `proto-shell.jsx` IAppBar — a coral
+    rounded square with three offset dots in honey, paper, and honey-soft.
+    Geometry follows Apple's macOS Big Sur icon template:
+      • 1024×1024 canvas, transparent surround
+      • content inset 96px on each side → 832×832 art area
+      • corner radius 185 (≈22% of 832), the macOS squircle radius
+  -->
+  <defs>
+    <linearGradient id="coral" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#E55934"/>
+      <stop offset="100%" stop-color="#C84621"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Coral squircle -->
+  <rect x="96" y="96" width="832" height="832" rx="185" fill="url(#coral)"/>
+
+  <!-- Subtle top highlight for depth (very soft) -->
+  <rect x="96" y="96" width="832" height="448" rx="185" fill="#FFFFFF" opacity="0.06"/>
+
+  <!-- Three offset crumb dots, scaled from the 88-px brand mark.
+       Original: (24,24) r=11, (65,63) r=8, (55,34) r=5. -->
+  <circle cx="320" cy="320" r="103" fill="#F3B95F"/>
+  <circle cx="705" cy="685" r="75"  fill="#FFFFFF"/>
+  <circle cx="615" cy="415" r="47"  fill="#FBE9C6"/>
+</svg>

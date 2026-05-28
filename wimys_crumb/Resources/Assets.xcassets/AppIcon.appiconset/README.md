@@ -1,29 +1,47 @@
 # App Icon
 
 `project.yml` references `AppIcon` via `ASSETCATALOG_COMPILER_APPICON_NAME`.
-Add the standard macOS icon set here:
 
-- `icon_16x16.png`     16×16  @1x
-- `icon_16x16@2x.png`  32×32  @2x
-- `icon_32x32.png`     32×32  @1x
-- `icon_32x32@2x.png`  64×64  @2x
-- `icon_128x128.png`     128
-- `icon_128x128@2x.png`  256
-- `icon_256x256.png`     256
-- `icon_256x256@2x.png`  512
-- `icon_512x512.png`     512
-- `icon_512x512@2x.png` 1024
+The PNGs in this folder are **generated** from a single source SVG:
+`docs/icon.svg` (1024×1024 master, Honey palette, follows Apple's macOS
+Big Sur icon template). Don't hand-edit the PNGs — edit the SVG and re-run
+the generator.
 
-Generate from a single 1024×1024 master with Sketch / Figma / Acorn, or use
-`iconutil` (Xcode bundled).
+## Regenerating
 
-Design direction (from the Honey prototype's `proto-shell.jsx` `IAppBar`):
+```sh
+brew install librsvg     # one-time
+./scripts/generate_icons.sh
+```
 
-- 1024×1024 canvas, rounded-rectangle background fill `#E55934` (coral).
-- Three offset circles in a "crumb dot trio":
-  - 256×256 honey `#F3B95F` near the top-left
-  - 192×192 paper `#FFFFFF` near the bottom-right
-  - 128×128 honey-soft `#FBE9C6` middle-right
+That renders the SVG into these 10 PNGs:
 
-After dropping PNGs in, `xcodegen generate` will pick the asset catalog up.
-The placeholder `Contents.json` below is the minimum xcassets accepts.
+| File                | Pixels |
+| ------------------- | ------ |
+| `icon_16.png`       | 16     |
+| `icon_16@2x.png`    | 32     |
+| `icon_32.png`       | 32     |
+| `icon_32@2x.png`    | 64     |
+| `icon_128.png`      | 128    |
+| `icon_128@2x.png`   | 256    |
+| `icon_256.png`      | 256    |
+| `icon_256@2x.png`   | 512    |
+| `icon_512.png`      | 512    |
+| `icon_512@2x.png`   | 1024   |
+
+`Contents.json` maps each appiconset slot to its filename, so once the PNGs
+land here Xcode picks them up on the next build (no `xcodegen generate`
+needed for icon-only changes).
+
+## Design
+
+From `proto-shell.jsx` `IAppBar` — coral squircle with the three-dot
+crumb mark:
+
+- Background: coral gradient `#E55934 → #C84621`, 832×832 inset on 1024
+  canvas, corner radius 185 (the macOS squircle ratio)
+- Top highlight: white at 6% opacity over the upper half for depth
+- Dot trio (scaled from the 88-px brand mark):
+  - honey `#F3B95F`, r=103 at (320, 320)
+  - paper `#FFFFFF`, r=75 at (705, 685)
+  - honey-soft `#FBE9C6`, r=47 at (615, 415)

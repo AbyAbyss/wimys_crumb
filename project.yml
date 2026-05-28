@@ -38,6 +38,12 @@ targets:
         CFBundleDisplayName: wimys_crumb
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
+        # Modern asset-catalog icon binding (macOS 11+). Without this key,
+        # LaunchServices/Dock fall back to the generic blueprint tile even
+        # though the asset catalog compiles fine. CFBundleIconFile is the
+        # legacy .icns fallback — kept so older tooling has a target too.
+        CFBundleIconName: AppIcon
+        CFBundleIconFile: AppIcon
         LSMinimumSystemVersion: "14.0"
         LSApplicationCategoryType: public.app-category.utilities
         NSHumanReadableCopyright: ""

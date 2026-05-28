@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-label="wimys_crumb — A friendly disk-space scanner for macOS">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#FBE9C6"/>
+      <stop offset="55%" stop-color="#FBF6EC"/>
+      <stop offset="100%" stop-color="#FDE3DA"/>
+    </linearGradient>
+    <pattern id="dots" x="0" y="0" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="1.4" cy="1.4" r="0.9" fill="#2A2118" opacity="0.10"/>
+    </pattern>
+    <linearGradient id="tileBig" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#E55934"/>
+      <stop offset="100%" stop-color="#D14823"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="1200" height="360" rx="20" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1200" height="360" rx="20" fill="url(#dots)"/>
+
+  <!-- Left: brand mark + wordmark + tagline + pill -->
+
+  <!-- Logo mark: coral rounded square with the dot trio -->
+  <g transform="translate(80, 102)">
+    <rect width="88" height="88" rx="22" fill="#E55934"/>
+    <circle cx="24" cy="24" r="11" fill="#F3B95F"/>
+    <circle cx="65" cy="63" r="8"  fill="#FFFFFF"/>
+    <circle cx="55" cy="34" r="5"  fill="#FBE9C6"/>
+  </g>
+
+  <!-- Wordmark "crumb" -->
+  <text x="196" y="178"
+        font-family="Bricolage Grotesque, system-ui, -apple-system, Helvetica, Arial, sans-serif"
+        font-size="110" font-weight="800"
+        fill="#2A2118" letter-spacing="-4">crumb</text>
+
+  <!-- Subtitle -->
+  <text x="80" y="230"
+        font-family="Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif"
+        font-size="20" font-weight="500"
+        fill="#7C6F5F">A friendly disk-space scanner for macOS.</text>
+
+  <!-- Ready-to-scan pill -->
+  <g transform="translate(80, 256)">
+    <rect width="186" height="32" rx="16" fill="#FFFFFF" stroke="#FDE3DA"/>
+    <circle cx="18" cy="16" r="4" fill="#E55934"/>
+    <text x="30" y="21"
+          font-family="Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif"
+          font-size="12" font-weight="700"
+          fill="#E55934" letter-spacing="0.3">FIND WHAT'S EATING SPACE</text>
+  </g>
+
+  <!-- Right: stylized Overview treemap preview -->
+  <g transform="translate(720, 56)">
+    <!-- Card frame -->
+    <rect x="0" y="0" width="400" height="248" rx="16" fill="#FFFFFF" stroke="#E8DFCC"/>
+    <text x="18" y="26"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="11" font-weight="700"
+          fill="#2A2118" letter-spacing="0.4">WHERE THE SPACE GOES</text>
+    <text x="332" y="26"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="11" font-weight="500"
+          fill="#7C6F5F">612 GB used</text>
+
+    <!-- Top row of tiles (height proportional to sum) -->
+    <g transform="translate(14, 42)">
+      <!-- Users / lina — biggest -->
+      <rect x="0"   y="0" width="232" height="118" rx="8" fill="url(#tileBig)"/>
+      <text x="14" y="32"
+            font-family="Inter, system-ui, sans-serif"
+            font-size="13" font-weight="600"
+            fill="#FFFFFF">Users</text>
+      <text x="14" y="74"
+            font-family="Bricolage Grotesque, system-ui, sans-serif"
+            font-size="30" font-weight="800"
+            fill="#FFFFFF" letter-spacing="-1">412 GB</text>
+
+      <!-- Applications -->
+      <rect x="240" y="0" width="78" height="118" rx="8" fill="#F3B95F"/>
+      <text x="252" y="28"
+            font-family="Inter, system-ui, sans-serif"
+            font-size="11" font-weight="600"
+            fill="#FFFFFF">Applications</text>
+      <text x="252" y="66"
+            font-family="Bricolage Grotesque, system-ui, sans-serif"
+            font-size="18" font-weight="800"
+            fill="#FFFFFF" letter-spacing="-0.6">78 GB</text>
+
+      <!-- System -->
+      <rect x="324" y="0" width="48" height="118" rx="8" fill="#5FA37C"/>
+      <text x="334" y="28"
+            font-family="Inter, system-ui, sans-serif"
+            font-size="10" font-weight="600"
+            fill="#FFFFFF">System</text>
+      <text x="334" y="64"
+            font-family="Bricolage Grotesque, system-ui, sans-serif"
+            font-size="15" font-weight="800"
+            fill="#FFFFFF" letter-spacing="-0.4">42 GB</text>
+    </g>
+
+    <!-- Bottom row -->
+    <g transform="translate(14, 168)">
+      <rect x="0"   y="0" width="110" height="64" rx="8" fill="#9E8FCF"/>
+      <text x="12" y="22"
+            font-family="Inter, system-ui, sans-serif"
+            font-size="10" font-weight="600"
+            fill="#FFFFFF">Library</text>
+      <text x="12" y="50"
+            font-family="Bricolage Grotesque, system-ui, sans-serif"
+            font-size="14" font-weight="800"
+            fill="#FFFFFF" letter-spacing="-0.3">36 GB</text>
+
+      <rect x="118" y="0" width="80"  height="64" rx="8" fill="#2C3E66"/>
+      <text x="130" y="22"
+            font-family="Inter, system-ui, sans-serif"
+            font-size="10" font-weight="600"
+            fill="#FFFFFF">opt</text>
+      <text x="130" y="50"
+            font-family="Bricolage Grotesque, system-ui, sans-serif"
+            font-size="14" font-weight="800"
+            fill="#FFFFFF" letter-spacing="-0.3">24 GB</text>
+
+      <rect x="206" y="0" width="68"  height="64" rx="8" fill="#D86A8A"/>
+      <text x="218" y="22"
+            font-family="Inter, system-ui, sans-serif"
+            font-size="10" font-weight="600"
+            fill="#FFFFFF">private</text>
+      <text x="218" y="50"
+            font-family="Bricolage Grotesque, system-ui, sans-serif"
+            font-size="14" font-weight="800"
+            fill="#FFFFFF" letter-spacing="-0.3">12 GB</text>
+
+      <rect x="282" y="0" width="50"  height="64" rx="8" fill="#7BAFD4"/>
+      <text x="290" y="22"
+            font-family="Inter, system-ui, sans-serif"
+            font-size="10" font-weight="600"
+            fill="#FFFFFF">Vol…</text>
+      <text x="290" y="50"
+            font-family="Bricolage Grotesque, system-ui, sans-serif"
+            font-size="13" font-weight="800"
+            fill="#FFFFFF" letter-spacing="-0.3">8 GB</text>
+
+      <rect x="340" y="0" width="32"  height="64" rx="8" fill="#E55934" opacity="0.55"/>
+    </g>
+  </g>
+
+  <!-- Small "Could free" badge tucked under the card -->
+  <g transform="translate(720, 312)">
+    <rect width="186" height="32" rx="10" fill="#2A2118"/>
+    <circle cx="18" cy="16" r="4" fill="#F3B95F"/>
+    <text x="30" y="21"
+          font-family="Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif"
+          font-size="12" font-weight="700"
+          fill="#FBE9C6" letter-spacing="0.3">COULD FREE 57 GB</text>
+  </g>
+</svg>
