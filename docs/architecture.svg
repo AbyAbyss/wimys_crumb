@@ -1,0 +1,305 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" width="1200" height="620" role="img" aria-label="wimys_crumb architecture — ScanEngine walks the filesystem, writes a per-scan SQLite database via GRDB, SwiftUI views read from it, and DeleteService patches it on deletion.">
+  <defs>
+    <linearGradient id="archBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#FBE9C6"/>
+      <stop offset="55%" stop-color="#FBF6EC"/>
+      <stop offset="100%" stop-color="#FDE3DA"/>
+    </linearGradient>
+    <pattern id="archDots" x="0" y="0" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="1.4" cy="1.4" r="0.9" fill="#2A2118" opacity="0.08"/>
+    </pattern>
+    <linearGradient id="engineFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#E55934"/>
+      <stop offset="100%" stop-color="#D14823"/>
+    </linearGradient>
+    <linearGradient id="dbFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#2C3E66"/>
+      <stop offset="100%" stop-color="#1F2D4D"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6"
+            markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M0,0 L12,6 L0,12 z" fill="#2A2118"/>
+    </marker>
+    <marker id="arrowSoft" viewBox="0 0 12 12" refX="10" refY="6"
+            markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M0,0 L12,6 L0,12 z" fill="#7C6F5F"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="1200" height="620" rx="20" fill="url(#archBg)"/>
+  <rect x="0" y="0" width="1200" height="620" rx="20" fill="url(#archDots)"/>
+
+  <!-- Title -->
+  <g transform="translate(48, 40)">
+    <rect width="88" height="28" rx="10" fill="#2A2118"/>
+    <text x="44" y="19" text-anchor="middle"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="11" font-weight="700"
+          fill="#F3B95F" letter-spacing="0.4">DATA FLOW</text>
+
+    <text x="0" y="68"
+          font-family="Bricolage Grotesque, system-ui, sans-serif"
+          font-size="30" font-weight="800"
+          fill="#2A2118" letter-spacing="-0.8">Disk walk · stream into SQLite · read from anywhere</text>
+    <text x="0" y="94"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="13" font-weight="500"
+          fill="#7C6F5F">The scan tree never lives in RAM. Memory stays bounded regardless of disk size.</text>
+  </g>
+
+  <!-- Main flow: Filesystem -> ScanEngine -> SQLite -> SwiftUI views -->
+  <!-- 1. FILESYSTEM SOURCE -->
+  <g transform="translate(60, 220)">
+    <rect width="200" height="200" rx="16" fill="#FFFFFF" stroke="#E8DFCC"/>
+    <text x="20" y="28"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="10" font-weight="700"
+          fill="#7C6F5F" letter-spacing="0.4">SOURCE</text>
+    <text x="20" y="58"
+          font-family="Bricolage Grotesque, system-ui, sans-serif"
+          font-size="22" font-weight="800"
+          fill="#2A2118" letter-spacing="-0.5">Filesystem</text>
+
+    <!-- mini folder tree -->
+    <g transform="translate(20, 76)" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#7C6F5F">
+      <g>
+        <rect x="0" y="0" width="14" height="11" rx="2" fill="#F3B95F"/>
+        <text x="20" y="10" font-weight="600" fill="#2A2118">/</text>
+      </g>
+      <g transform="translate(14, 18)">
+        <rect x="0" y="0" width="12" height="9" rx="2" fill="#F3B95F" opacity="0.85"/>
+        <text x="18" y="8">Users/</text>
+      </g>
+      <g transform="translate(14, 34)">
+        <rect x="0" y="0" width="12" height="9" rx="2" fill="#F3B95F" opacity="0.85"/>
+        <text x="18" y="8">Applications/</text>
+      </g>
+      <g transform="translate(14, 50)">
+        <rect x="0" y="0" width="12" height="9" rx="2" fill="#F3B95F" opacity="0.85"/>
+        <text x="18" y="8">Library/</text>
+      </g>
+      <g transform="translate(14, 66)">
+        <rect x="0" y="0" width="12" height="9" rx="2" fill="#F3B95F" opacity="0.85"/>
+        <text x="18" y="8">System/</text>
+      </g>
+      <g transform="translate(14, 82)">
+        <rect x="0" y="0" width="12" height="9" rx="2" fill="#F3B95F" opacity="0.6"/>
+        <text x="18" y="8">...</text>
+      </g>
+    </g>
+
+    <text x="20" y="186"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="11" font-weight="500"
+          fill="#7C6F5F">~5M files in minutes</text>
+  </g>
+
+  <!-- 2. SCAN ENGINE -->
+  <g transform="translate(330, 220)">
+    <rect width="240" height="200" rx="16" fill="url(#engineFill)"/>
+    <text x="20" y="28"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="10" font-weight="700"
+          fill="#FBE9C6" letter-spacing="0.4">ENGINE</text>
+    <text x="20" y="58"
+          font-family="Bricolage Grotesque, system-ui, sans-serif"
+          font-size="22" font-weight="800"
+          fill="#FFFFFF" letter-spacing="-0.5">ScanEngine</text>
+    <text x="20" y="78"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="11" font-weight="600"
+          fill="#FBE9C6" opacity="0.9">actor · off main thread</text>
+
+    <g transform="translate(20, 96)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500" fill="#FFFFFF">
+      <g>
+        <circle cx="3" cy="6" r="2" fill="#FBE9C6"/>
+        <text x="14" y="10">FileManager.enumerator</text>
+      </g>
+      <g transform="translate(0, 18)">
+        <circle cx="3" cy="6" r="2" fill="#FBE9C6"/>
+        <text x="14" y="10">autoreleasepool per dir</text>
+      </g>
+      <g transform="translate(0, 36)">
+        <circle cx="3" cy="6" r="2" fill="#FBE9C6"/>
+        <text x="14" y="10">classify by extension</text>
+      </g>
+      <g transform="translate(0, 54)">
+        <circle cx="3" cy="6" r="2" fill="#FBE9C6"/>
+        <text x="14" y="10">skip firmlinks &amp; system mounts</text>
+      </g>
+      <g transform="translate(0, 72)">
+        <circle cx="3" cy="6" r="2" fill="#FBE9C6"/>
+        <text x="14" y="10">stream rows, commit every 1k</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- 3. SQLITE DATABASE -->
+  <g transform="translate(640, 220)">
+    <rect width="240" height="200" rx="16" fill="url(#dbFill)"/>
+    <text x="20" y="28"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="10" font-weight="700"
+          fill="#9CC3FF" letter-spacing="0.4">PERSISTENCE</text>
+    <text x="20" y="58"
+          font-family="Bricolage Grotesque, system-ui, sans-serif"
+          font-size="22" font-weight="800"
+          fill="#FFFFFF" letter-spacing="-0.5">SQLite</text>
+    <text x="20" y="78"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="11" font-weight="600"
+          fill="#9CC3FF" opacity="0.9">via GRDB · WAL · mmap 256 MB</text>
+
+    <!-- "DB cylinder" -->
+    <g transform="translate(154, 96)">
+      <ellipse cx="40" cy="8" rx="40" ry="8" fill="#9CC3FF" opacity="0.7"/>
+      <rect x="0" y="8" width="80" height="60" fill="#9CC3FF" opacity="0.7"/>
+      <ellipse cx="40" cy="68" rx="40" ry="8" fill="#9CC3FF"/>
+      <ellipse cx="40" cy="28" rx="40" ry="8" fill="none" stroke="#2C3E66" stroke-width="1" opacity="0.6"/>
+      <ellipse cx="40" cy="48" rx="40" ry="8" fill="none" stroke="#2C3E66" stroke-width="1" opacity="0.6"/>
+    </g>
+
+    <g transform="translate(20, 100)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500" fill="#FFFFFF">
+      <text x="0" y="0" font-weight="700" fill="#9CC3FF" letter-spacing="0.4">TABLES</text>
+      <text x="0" y="18">dirs</text>
+      <text x="0" y="34">large_files</text>
+      <text x="0" y="50">file_type_totals</text>
+      <text x="0" y="66">snapshot_top_folders</text>
+      <text x="0" y="82">scans</text>
+    </g>
+
+    <text x="20" y="186"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="10" font-weight="600"
+          fill="#9CC3FF" opacity="0.85" letter-spacing="0.3">~/Library/Application Support/wimys_crumb/scans/</text>
+  </g>
+
+  <!-- 4. SWIFTUI VIEWS -->
+  <g transform="translate(950, 220)">
+    <rect width="200" height="200" rx="16" fill="#FFFFFF" stroke="#E8DFCC"/>
+    <text x="20" y="28"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="10" font-weight="700"
+          fill="#7C6F5F" letter-spacing="0.4">UI</text>
+    <text x="20" y="58"
+          font-family="Bricolage Grotesque, system-ui, sans-serif"
+          font-size="22" font-weight="800"
+          fill="#2A2118" letter-spacing="-0.5">SwiftUI views</text>
+
+    <g transform="translate(20, 76)" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="500" fill="#2A2118">
+      <g>
+        <rect x="0" y="0" width="14" height="14" rx="3" fill="#E55934"/>
+        <text x="22" y="11">Overview</text>
+      </g>
+      <g transform="translate(0, 22)">
+        <rect x="0" y="0" width="14" height="14" rx="3" fill="#F3B95F"/>
+        <text x="22" y="11">Drill-down</text>
+      </g>
+      <g transform="translate(0, 44)">
+        <rect x="0" y="0" width="14" height="14" rx="3" fill="#9E8FCF"/>
+        <text x="22" y="11">Groups</text>
+      </g>
+      <g transform="translate(0, 66)">
+        <rect x="0" y="0" width="14" height="14" rx="3" fill="#5FA37C"/>
+        <text x="22" y="11">File types</text>
+      </g>
+      <g transform="translate(0, 88)">
+        <rect x="0" y="0" width="14" height="14" rx="3" fill="#7BAFD4"/>
+        <text x="22" y="11">History</text>
+      </g>
+    </g>
+
+    <text x="20" y="186"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="11" font-weight="500"
+          fill="#7C6F5F">short-lived queries · &lt;200 MB resident</text>
+  </g>
+
+  <!-- Arrows along the main flow -->
+  <!-- FS -> Engine -->
+  <g>
+    <line x1="266" y1="320" x2="324" y2="320" stroke="#2A2118" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="295" y="310" text-anchor="middle"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="10" font-weight="700"
+          fill="#7C6F5F" letter-spacing="0.4">walk</text>
+  </g>
+  <!-- Engine -> DB -->
+  <g>
+    <line x1="576" y1="320" x2="634" y2="320" stroke="#2A2118" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="605" y="310" text-anchor="middle"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="10" font-weight="700"
+          fill="#7C6F5F" letter-spacing="0.4">stream</text>
+  </g>
+  <!-- DB -> Views -->
+  <g>
+    <line x1="886" y1="320" x2="944" y2="320" stroke="#2A2118" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="915" y="310" text-anchor="middle"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="10" font-weight="700"
+          fill="#7C6F5F" letter-spacing="0.4">read</text>
+  </g>
+
+  <!-- DeleteService branch (bottom) -->
+  <g transform="translate(560, 470)">
+    <rect width="200" height="110" rx="14" fill="#2A2118"/>
+    <text x="16" y="26"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="10" font-weight="700"
+          fill="#F3B95F" letter-spacing="0.4">SAFE WRITES</text>
+    <text x="16" y="56"
+          font-family="Bricolage Grotesque, system-ui, sans-serif"
+          font-size="20" font-weight="800"
+          fill="#FBE9C6" letter-spacing="-0.4">DeleteService</text>
+    <text x="16" y="76"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="11" font-weight="500"
+          fill="#F3B95F" opacity="0.85">protected paths · trash · CTE patch</text>
+    <text x="16" y="96"
+          font-family="Inter, system-ui, sans-serif"
+          font-size="11" font-weight="500"
+          fill="#FBE9C6" opacity="0.65">no rescan needed</text>
+  </g>
+
+  <!-- Arrows from delete service -->
+  <!-- Views -> DeleteService (request) -->
+  <path d="M1050 420 C 1050 460, 760 460, 760 510"
+        stroke="#7C6F5F" stroke-width="1.5" stroke-dasharray="4 4"
+        fill="none" marker-end="url(#arrowSoft)"/>
+  <text x="940" y="448"
+        font-family="Inter, system-ui, sans-serif"
+        font-size="10" font-weight="700"
+        fill="#7C6F5F" letter-spacing="0.4">delete request</text>
+
+  <!-- DeleteService -> DB (patch) -->
+  <path d="M620 470 C 620 450, 760 450, 760 420"
+        stroke="#7C6F5F" stroke-width="1.5" stroke-dasharray="4 4"
+        fill="none" marker-end="url(#arrowSoft)"/>
+  <text x="660" y="442"
+        font-family="Inter, system-ui, sans-serif"
+        font-size="10" font-weight="700"
+        fill="#7C6F5F" letter-spacing="0.4">patchAfterDelete (CTE)</text>
+
+  <!-- DeleteService -> Trash -->
+  <g transform="translate(820, 500)">
+    <line x1="0" y1="20" x2="60" y2="20" stroke="#7C6F5F" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrowSoft)"/>
+    <g transform="translate(76, 6)">
+      <path d="M0 4 h28 v22 a2 2 0 0 1 -2 2 h-24 a2 2 0 0 1 -2 -2 z"
+            fill="#FBF6EC" stroke="#7C6F5F" stroke-width="1.5"/>
+      <line x1="0" y1="4" x2="28" y2="4" stroke="#7C6F5F" stroke-width="1.5"/>
+      <line x1="10" y1="0" x2="18" y2="0" stroke="#7C6F5F" stroke-width="1.5"/>
+      <text x="14" y="46" text-anchor="middle"
+            font-family="Inter, system-ui, sans-serif"
+            font-size="10" font-weight="700"
+            fill="#7C6F5F">Trash</text>
+    </g>
+  </g>
+
+  <!-- Footer note -->
+  <text x="60" y="600"
+        font-family="Inter, system-ui, sans-serif"
+        font-size="11" font-weight="600"
+        fill="#7C6F5F" letter-spacing="0.2">Engine, DB and views run on independent loops · queries are short-lived · the only mutation path is DeleteService.</text>
+</svg>
