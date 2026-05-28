@@ -1,0 +1,59 @@
+name: wimys_crumb
+options:
+  bundleIdPrefix: app.wimys
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  defaultConfig: Debug
+
+settings:
+  base:
+    SWIFT_VERSION: "5"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    # Sandbox OFF per implementation plan §2.2 (true whole-system scan).
+    ENABLE_APP_SANDBOX: NO
+    CODE_SIGN_STYLE: Automatic
+
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: "6.29.0"
+
+targets:
+  wimys_crumb:
+    type: application
+    platform: macOS
+    sources:
+      - path: wimys_crumb
+    resources:
+      - path: wimys_crumb/Resources
+        optional: true
+    dependencies:
+      - package: GRDB
+        product: GRDB
+    info:
+      path: wimys_crumb/Info.plist
+      properties:
+        CFBundleDisplayName: wimys_crumb
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "14.0"
+        LSApplicationCategoryType: public.app-category.utilities
+        NSHumanReadableCopyright: ""
+        NSDesktopFolderUsageDescription: "wimys_crumb scans your Desktop to show what's taking up space."
+        NSDocumentsFolderUsageDescription: "wimys_crumb scans your Documents to show what's taking up space."
+        NSDownloadsFolderUsageDescription: "wimys_crumb scans your Downloads to show what's taking up space."
+        NSAppleEventsUsageDescription: "wimys_crumb uses Apple Events to reveal items in Finder."
+        NSPrincipalClass: NSApplication
+        # Font files dropped into Resources/Fonts/ will be picked up automatically
+        # via CTFontManagerRegisterFontsForURLs at launch (see Theme.registerFonts()).
+        # ATSApplicationFontsPath is not used so the loader can do versioned discovery.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.wimys.crumb
+        PRODUCT_NAME: wimys_crumb
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        COMBINE_HIDPI_IMAGES: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

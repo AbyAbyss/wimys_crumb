@@ -1,0 +1,20 @@
+Drop the bundled font files here (one weight per file):
+
+  BricolageGrotesque-Medium.ttf
+  BricolageGrotesque-SemiBold.ttf
+  BricolageGrotesque-Bold.ttf
+  BricolageGrotesque-ExtraBold.ttf
+  Geist-Regular.otf
+  Geist-Medium.otf
+  Geist-SemiBold.otf
+  Geist-Bold.otf
+  GeistMono-Regular.otf
+  GeistMono-Medium.otf
+  GeistMono-SemiBold.otf
+
+They are registered at launch by Theme.registerFonts() (any .ttf/.otf/.ttc
+in this folder is picked up via CTFontManagerRegisterFontsForURLs).
+Until the files are present, macOS falls back to the system font.
+
+Both Bricolage Grotesque and Geist / Geist Mono are SIL OFL — bundle the
+license files alongside the fonts.
