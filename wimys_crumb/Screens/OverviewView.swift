@@ -14,6 +14,9 @@ struct OverviewView: View {
             if app.shouldShowFDAPrompt {
                 fdaBanner
             }
+            if app.isCurrentScanStale {
+                staleBanner
+            }
             statRow
             HStack(alignment: .top, spacing: Spacing.cardGap) {
                 treemapCard
@@ -28,6 +31,42 @@ struct OverviewView: View {
         .padding(.horizontal, Spacing.screenH)
         .padding(.bottom, Spacing.screenV)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// Banner shown when the loaded scan finished more than 4 hours ago.
+    /// Tap Rescan to refresh against the current state of the drive.
+    private var staleBanner: some View {
+        HStack(alignment: .top, spacing: 12) {
+            IconView(icon: .clock, size: 18)
+                .foregroundStyle(Color.cHoney)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("This scan is older than 4 hours")
+                    .font(Theme.body(14, weight: .bold))
+                    .foregroundStyle(Color.cInk)
+                if let t = app.currentScanCompletedAt {
+                    Text("Finished \(Fmt.relative(t)). Your drive may have changed since — rescan for fresh numbers.")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Color.cInk2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer()
+            Button("Rescan") {
+                if let vol = app.currentVolume { app.startScan(volume: vol) }
+            }
+            .controlSize(.small)
+            .disabled(app.currentVolume == nil)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.cHoneySoft)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.cLine2, lineWidth: 1)
+                )
+        )
     }
 
     /// Banner shown when the scan couldn't read enough paths that the

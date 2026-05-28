@@ -63,6 +63,10 @@ final class AppModel {
     var groupsInstances: [DirRow] = []      // children of the currently expanded group
     var groupsSelection: Set<Int64> = []    // selected dirIds across instances
     var groupsFilter: GroupsFilter = .all
+    /// Pre-resolved full paths for the currently expanded group's instances.
+    /// Computed off-main after expand so 3k+ instance groups (e.g. __pycache__)
+    /// don't pay a per-row SQL hit on every render.
+    var groupsInstancePaths: [Int64: String] = [:]
 
     // MARK: - File types (Types screen)
     /// Currently focused category in the Types screen detail panel.
@@ -91,6 +95,17 @@ final class AppModel {
 
     // MARK: - Session totals
     var freedBytes: Int64 = 0
+
+    /// When the currently-displayed scan finished. Set on fresh scan completion
+    /// and on loadScan(from:); cleared when no scan is loaded. Drives the
+    /// "this scan is stale, rescan?" banner on Overview.
+    var currentScanCompletedAt: Date? = nil
+
+    /// True iff the loaded scan is older than 4 hours.
+    var isCurrentScanStale: Bool {
+        guard let t = currentScanCompletedAt else { return false }
+        return -t.timeIntervalSinceNow > 4 * 3600
+    }
 
     // MARK: - Active scan resources
     private(set) var currentDb: ScanDatabase? = nil
@@ -533,6 +548,7 @@ final class AppModel {
                 // so the prompt re-appears for the new scan's verdict.
                 self.skippedCount = skippedCount
                 self.fdaPromptDismissed = false
+                self.currentScanCompletedAt = Date()
                 self.loadOverview()
                 self.loadGroups()
                 self.loadHistory()
@@ -581,6 +597,96 @@ final class AppModel {
         try? FileManager.default.removeItem(at: db.url)
     }
 
+    /// Open a previously-saved scan database and route to Overview.
+    /// Called from the Start screen's "Last scans" list. Idempotent: clicking
+    /// the row for the currently-loaded scan just navigates without a reopen.
+    func loadScan(from url: URL) {
+        // Already loaded → just go.
+        if currentDb?.url == url {
+            screen = .overview
+            return
+        }
+        // Don't replace an in-progress scan from under itself.
+        if isScanning {
+            showToast("Wait for the current scan to finish first.")
+            return
+        }
+        do {
+            let db = try ScanDatabase(url: url)
+            guard let summary = try db.latestCompletedScan() else {
+                showToast("That scan has no summary row yet.")
+                return
+            }
+            currentDb = db
+            currentScanCompletedAt = summary.completedAt ?? summary.startedAt
+            // Reuse the live VolumeInfo if the volume is still mounted so the
+            // Used / Free stat cards stay accurate. Otherwise synthesize a
+            // placeholder from the scan's recorded totals.
+            currentVolume = volumes.first(where: { $0.id == summary.volumeUUID })
+                ?? VolumeInfo(
+                    id: summary.volumeUUID,
+                    name: summary.volumeName,
+                    kind: .internal,
+                    totalCapacity: (summary.totalUsed ?? 0) + (summary.totalFree ?? 0),
+                    availableCapacity: summary.totalFree ?? 0,
+                    url: URL(fileURLWithPath: "/")
+                )
+            // Clear any drill/groups state from a prior scan before re-querying.
+            resetDrillState()
+            expandedGroup = nil
+            groupsInstances = []
+            groupsInstancePaths = [:]
+            groupsSelection = []
+            historySummaries = []
+            historyDeltas = []
+            freedBytes = 0
+
+            loadOverview()
+            loadGroups()
+            loadHistory()
+            screen = .overview
+            if isCurrentScanStale {
+                showToast("Loaded a scan from \(Fmt.relative(currentScanCompletedAt!)). Rescan for fresh data.")
+            }
+        } catch {
+            showToast("Couldn't open that scan: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Snapshots panel hooks (plan §8.9)
+
+    /// URL of the currently-open scan database, if any.
+    var currentScanDatabaseURL: URL? { currentDb?.url }
+
+    /// True iff the given snapshot URL backs the currently-open scan.
+    func isCurrentScanDatabase(_ url: URL) -> Bool {
+        currentDb?.url == url
+    }
+
+    /// The Snapshots panel deleted the database we were reading from.
+    /// Drop the open handle, clear scan-derived UI state, and return to Start.
+    func handleDeletedCurrentScan() {
+        currentDb = nil
+        currentScanCompletedAt = nil
+        overviewTopFolders = []
+        overviewTypes = []
+        suggestions = []
+        overviewStats = OverviewStats()
+        groups = []
+        expandedGroup = nil
+        groupsInstances = []
+        groupsInstancePaths = [:]
+        groupsSelection = []
+        drillItems = []
+        drillCrumb = []
+        drillSelection = []
+        typesSelected = nil
+        typesTopFiles = []
+        historySummaries = []
+        historyDeltas = []
+        screen = .start
+    }
+
     // MARK: - Groups loader / expand
 
     /// Run after a scan completes. Aggregates the known group names
@@ -617,6 +723,8 @@ final class AppModel {
         if expandedGroup == name {
             expandedGroup = nil
             groupsInstances = []
+            groupsInstancePaths = [:]
+            groupsSelection = []
             return
         }
         do {
@@ -624,9 +732,53 @@ final class AppModel {
             let rows = try db.groupInstances(name: name, namesForExclusion: names)
             expandedGroup = name
             groupsInstances = rows
+            groupsInstancePaths = [:]
+            groupsSelection = []
+            // Resolve all instance paths off-main. With 3k entries × ~8 depth
+            // = ~24k single-row reads, running this synchronously would freeze
+            // the UI for ~1s; doing it detached and assigning back in one shot
+            // keeps the row expansion snappy.
+            let ids = rows.map(\.id)
+            Task.detached { [weak self] in
+                let resolver = PathResolver(db: db)
+                var paths: [Int64: String] = [:]
+                paths.reserveCapacity(ids.count)
+                for id in ids { paths[id] = resolver.fullPath(of: id) }
+                let finalPaths = paths
+                await MainActor.run {
+                    guard let self else { return }
+                    // The user may have collapsed or switched groups while we
+                    // were resolving — drop the result if so.
+                    guard self.expandedGroup == name else { return }
+                    self.groupsInstancePaths = finalPaths
+                }
+            }
         } catch {
             showToast("Couldn't expand group: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Group bulk selection
+
+    /// Select every instance in the currently expanded group.
+    func selectAllInExpandedGroup() {
+        groupsSelection = Set(groupsInstances.map(\.id))
+    }
+
+    /// Select only instances not modified in the last 180 days.
+    func selectStaleInExpandedGroup() {
+        let cutoff = Date().addingTimeInterval(-180 * 86_400)
+        groupsSelection = Set(
+            groupsInstances.compactMap { row in
+                guard let m = row.mtime, m < cutoff else { return nil }
+                return row.id
+            }
+        )
+    }
+
+    /// Drop the current group selection.
+    func clearGroupSelection() {
+        groupsSelection = []
     }
 
     /// Bulk delete the currently-selected group instances. The selection
@@ -636,7 +788,10 @@ final class AppModel {
               let resolver = pathResolver else { return }
         let chosen = groupsInstances.filter { groupsSelection.contains($0.id) }
         let targets = chosen.map { row -> DeleteTarget in
-            let path = resolver.fullPath(of: row.id)
+            // Reuse the pre-resolved path from expand-time when available;
+            // fall back to a fresh resolve only for rows the background pass
+            // hadn't reached yet.
+            let path = groupsInstancePaths[row.id] ?? resolver.fullPath(of: row.id)
             return DeleteTarget(
                 dirId: row.id,
                 fileName: nil,
@@ -855,11 +1010,34 @@ final class AppModel {
     }
 
     func refreshRecentScans() {
-        recentScans = scanStore.listCompleted().prefix(5).map { url in
+        // Render immediately with the filename mtime as a date and the raw
+        // filename as a placeholder name, then enrich off-main with the real
+        // volume name + scan totals read from each DB. Two-pass keeps the
+        // Start screen snappy on launch even if loadSnapshots is slow.
+        let urls = scanStore.listCompleted().prefix(5)
+        recentScans = urls.map { url in
             let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
                 .contentModificationDate ?? .distantPast
-            return RecentScan(id: url, volumeName: url.deletingPathExtension().lastPathComponent,
-                              startedAt: date, totalUsed: nil)
+            return RecentScan(id: url,
+                              volumeName: url.deletingPathExtension().lastPathComponent,
+                              startedAt: date,
+                              totalUsed: nil)
+        }
+        let store = scanStore
+        Task.detached { [weak self] in
+            let enriched: [RecentScan] = store.loadSnapshots().prefix(5).map { snap in
+                RecentScan(id: snap.url,
+                           volumeName: snap.volumeName,
+                           startedAt: snap.startedAt,
+                           totalUsed: snap.totalUsed)
+            }
+            await MainActor.run {
+                guard let self else { return }
+                // Keep the freshly-loaded URLs ordering even if loadSnapshots
+                // ran in a different order — but they're both sorted newest
+                // first by listCompleted(), so this just replaces wholesale.
+                self.recentScans = enriched
+            }
         }
     }
 

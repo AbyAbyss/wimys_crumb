@@ -122,4 +122,86 @@ struct ScanStore {
             }
         }
     }
+
+    // MARK: - Snapshots panel support (plan §8.9 / §12.4)
+
+    /// One scan database, with the metadata needed to render the Snapshots
+    /// panel row: which volume, when, how much it weighs on disk.
+    struct SnapshotInfo: Identifiable, Sendable {
+        let url: URL
+        let volumeName: String
+        let volumeUUID: String
+        let startedAt: Date
+        let completedAt: Date?
+        let totalUsed: Int64?
+        let sizeOnDisk: Int64
+        var id: URL { url }
+    }
+
+    /// Open each completed scan DB read-only, pull its latest `scans` row,
+    /// and tally the on-disk footprint (.sqlite + sidecar -shm/-wal).
+    /// Blocking — call off the main thread. ~10 files per volume worst case,
+    /// each open is cheap, but we still want to keep this off the UI thread.
+    ///
+    /// Each ScanDatabase is opened inside a tight helper scope so its
+    /// DatabasePool deinits (and closes its file handles) before the next
+    /// iteration — important because the panel that calls this may turn
+    /// around and delete these files via deleteSnapshot/clearAllSnapshots.
+    func loadSnapshots() -> [SnapshotInfo] {
+        listCompleted().compactMap { url -> SnapshotInfo? in
+            guard let summary = readSummary(of: url) else { return nil }
+            return SnapshotInfo(
+                url: url,
+                volumeName: summary.volumeName,
+                volumeUUID: summary.volumeUUID,
+                startedAt: summary.startedAt,
+                completedAt: summary.completedAt,
+                totalUsed: summary.totalUsed,
+                sizeOnDisk: Self.sizeOnDisk(of: url)
+            )
+        }
+    }
+
+    /// Open one scan DB, read the latest `scans` row, release the pool.
+    /// Pulled out so the `db` local is guaranteed to be the only strong
+    /// reference and dies at function return.
+    private func readSummary(of url: URL) -> ScanRowSummary? {
+        guard let db = try? ScanDatabase(url: url) else { return nil }
+        return try? db.latestCompletedScan()
+    }
+
+    /// Delete one scan database plus its WAL/SHM sidecars. Best-effort.
+    func deleteSnapshot(_ url: URL) {
+        let fm = FileManager.default
+        try? fm.removeItem(at: url)
+        let base = url.deletingPathExtension()
+        try? fm.removeItem(at: base.appendingPathExtension("sqlite-shm"))
+        try? fm.removeItem(at: base.appendingPathExtension("sqlite-wal"))
+    }
+
+    /// Remove every completed scan. Used by the "Clear all scan data" action.
+    func clearAllSnapshots() {
+        for url in listCompleted() {
+            deleteSnapshot(url)
+        }
+    }
+
+    /// Sum the .sqlite + -shm + -wal file sizes.
+    private static func sizeOnDisk(of url: URL) -> Int64 {
+        let fm = FileManager.default
+        let base = url.deletingPathExtension()
+        let candidates = [
+            url,
+            base.appendingPathExtension("sqlite-shm"),
+            base.appendingPathExtension("sqlite-wal"),
+        ]
+        var total: Int64 = 0
+        for u in candidates {
+            if let attrs = try? fm.attributesOfItem(atPath: u.path),
+               let size = attrs[.size] as? NSNumber {
+                total += size.int64Value
+            }
+        }
+        return total
+    }
 }

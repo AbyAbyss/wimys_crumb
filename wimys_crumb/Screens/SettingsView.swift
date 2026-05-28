@@ -1,9 +1,8 @@
 // SettingsView.swift
 // 210pt sidebar + content panel. Plan §8.9.
 //
-// Safety + Scans are real; Detection / Snapshots / Export / About are
-// honest "coming soon" panels for v1 — each has a clear hook where the
-// real feature lands later.
+// Safety, Scans, Detection, Snapshots, Export, and About are all real.
+// Detection is read-only in v1 (group catalog + large-file threshold).
 
 import SwiftUI
 import AppKit
@@ -98,12 +97,8 @@ struct SettingsView: View {
                     switch section {
                     case .safety:    SafetyPanel(app: app)
                     case .scans:     ScansPanel()
-                    case .detection: ComingSoonPanel(name: "Detection",
-                                                     icon: .sparkle,
-                                                     body_: "Heuristics for finding duplicates, near-duplicate photos, and large-blob caches will live here.")
-                    case .snapshots: ComingSoonPanel(name: "Snapshots",
-                                                     icon: .chart,
-                                                     body_: "Restore-points and pre-delete snapshots. Each scan already writes a small history row; this panel will let you browse them, compare, and restore.")
+                    case .detection: DetectionPanel()
+                    case .snapshots: SnapshotsPanel(app: app)
                     case .export:    ExportPanel(app: app)
                     case .about:     AboutPanel()
                     }
@@ -529,24 +524,257 @@ private struct PanelHeader: View {
     }
 }
 
-private struct ComingSoonPanel: View {
-    let name: String
-    let icon: AppIcon
-    let body_: String
+// MARK: - Detection (read-only in v1)
+
+private struct DetectionPanel: View {
+    /// Mirrors the constant in ScanEngine.swift. Kept inline here because the
+    /// engine declaration is `private`; this is a read-only display in v1.
+    private let largeFileThresholdBytes: Int64 = 10_000_000
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             PanelHeader(
-                icon: icon,
-                title: name,
-                subtitle: body_
+                icon: .sparkle,
+                title: "Detection",
+                subtitle: "Folder names Crumb groups across the disk, plus the large-file threshold."
             )
+
+            // Group catalog
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Tracked group names")
+                    .font(Theme.body(14, weight: .bold))
+                    .foregroundStyle(Color.cInk)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(GroupCatalog.entries.enumerated()), id: \.offset) { idx, entry in
+                        groupRow(entry)
+                        if idx != GroupCatalog.entries.count - 1 {
+                            Divider().overlay(Color.cLine)
+                        }
+                    }
+                }
+                .background(Color.cPanel)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.cLine, lineWidth: 1)
+                )
+            }
+
+            // Large-file threshold
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Large-file threshold")
+                    .font(Theme.body(14, weight: .bold))
+                    .foregroundStyle(Color.cInk)
+
+                Card(pad: 14) {
+                    HStack(alignment: .top, spacing: 12) {
+                        IconView(icon: .sparkle, size: 18)
+                            .foregroundStyle(Color.cInk2)
+                            .padding(.top, 1)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("≥ \(Fmt.bytes(largeFileThresholdBytes))")
+                                .font(Theme.display(20, weight: .heavy))
+                                .tracking(-0.3)
+                                .foregroundStyle(Color.cInk)
+                            Text("Files this big or larger are kept in the per-type heaviest-files list shown on the File types screen.")
+                                .font(Theme.body(12))
+                                .foregroundStyle(Color.cInk2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+
             HStack(spacing: 8) {
-                Pill(text: "coming soon", color: .cInk2, soft: .cPanel)
-                Text("This section is intentionally stubbed for v1.")
+                Pill(text: "read-only", color: .cInk2, soft: .cPanel)
+                Text("Editing the group list and threshold is on the v2 roadmap.")
                     .font(Theme.body(12))
                     .foregroundStyle(Color.cInk3)
             }
         }
+    }
+
+    private func groupRow(_ entry: GroupCatalog.Entry) -> some View {
+        HStack(spacing: 10) {
+            Text(entry.name)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(Color.cInk)
+            if entry.devOnly {
+                Pill(text: "dev", color: .cLilac, soft: .cLilacSoft)
+            }
+            Spacer()
+            Text(entry.tagline)
+                .font(Theme.body(12))
+                .foregroundStyle(Color.cInk2)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Snapshots (per-scan list + delete + clear all)
+
+private struct SnapshotsPanel: View {
+    @Bindable var app: AppModel
+
+    @State private var snapshots: [ScanStore.SnapshotInfo] = []
+    @State private var loading: Bool = true
+    @State private var pendingDelete: ScanStore.SnapshotInfo? = nil
+    @State private var confirmClearAll: Bool = false
+
+    private var totalBytes: Int64 {
+        snapshots.reduce(0) { $0 + $1.sizeOnDisk }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            PanelHeader(
+                icon: .chart,
+                title: "Snapshots",
+                subtitle: "Every completed scan lives in its own SQLite file. Delete the ones you no longer need."
+            )
+
+            if loading {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Reading scan files…")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Color.cInk2)
+                }
+            } else if snapshots.isEmpty {
+                Card(pad: 14) {
+                    HStack(spacing: 10) {
+                        IconView(icon: .chart, size: 16)
+                            .foregroundStyle(Color.cInk3)
+                        Text("No scans yet — run one from the Start screen.")
+                            .font(Theme.body(13))
+                            .foregroundStyle(Color.cInk2)
+                        Spacer()
+                    }
+                }
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(snapshots) { snap in
+                        snapshotRow(snap)
+                        if snap.id != snapshots.last?.id {
+                            Divider().overlay(Color.cLine)
+                        }
+                    }
+                }
+                .background(Color.cPanel)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.cLine, lineWidth: 1)
+                )
+
+                HStack {
+                    Text("\(snapshots.count) scan\(snapshots.count == 1 ? "" : "s") · \(Fmt.bytes(totalBytes)) on disk")
+                        .font(Theme.body(12))
+                        .foregroundStyle(Color.cInk2)
+                    Spacer()
+                    Button(role: .destructive) {
+                        confirmClearAll = true
+                    } label: {
+                        Text("Clear all scan data")
+                            .font(Theme.body(12, weight: .semibold))
+                    }
+                    .controlSize(.small)
+                }
+            }
+        }
+        .onAppear(perform: reload)
+        .alert("Delete this scan?", isPresented: Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }
+        )) {
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let snap = pendingDelete { performDelete(snap) }
+                pendingDelete = nil
+            }
+        } message: {
+            if let snap = pendingDelete {
+                Text("Removes \(snap.volumeName) — \(Fmt.bytes(snap.sizeOnDisk)). The scan data is gone for good (the files themselves aren't touched).")
+            }
+        }
+        .alert("Clear all scan data?", isPresented: $confirmClearAll) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear all", role: .destructive) { performClearAll() }
+        } message: {
+            Text("Deletes every scan database (\(Fmt.bytes(totalBytes))). Your files are untouched; only Crumb's history of them is removed.")
+        }
+    }
+
+    private func snapshotRow(_ snap: ScanStore.SnapshotInfo) -> some View {
+        HStack(spacing: 10) {
+            IconView(icon: .chart, size: 12)
+                .foregroundStyle(Color.cInk2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(snap.volumeName)
+                    .font(Theme.body(13, weight: .semibold))
+                    .foregroundStyle(Color.cInk)
+                Text("\(Fmt.relative(snap.startedAt)) · \(Fmt.bytes(snap.sizeOnDisk))")
+                    .font(Theme.body(11))
+                    .foregroundStyle(Color.cInk2)
+            }
+            Spacer()
+            if let used = snap.totalUsed {
+                Text(Fmt.bytes(used))
+                    .font(Theme.body(12, weight: .semibold))
+                    .foregroundStyle(Color.cInk)
+                    .monospacedDigit()
+            }
+            Button { pendingDelete = snap } label: {
+                IconView(icon: .x, size: 11)
+                    .foregroundStyle(Color.cInk2)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .help("Delete this scan")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    // MARK: - Actions
+
+    private func reload() {
+        loading = true
+        Task.detached {
+            let store = ScanStore()
+            let snaps = store.loadSnapshots()
+            await MainActor.run {
+                snapshots = snaps
+                loading = false
+            }
+        }
+    }
+
+    private func performDelete(_ snap: ScanStore.SnapshotInfo) {
+        let wasCurrent = app.isCurrentScanDatabase(snap.url)
+        // Drop AppModel's open DatabasePool BEFORE deleting the file. If we
+        // unlink while GRDB still holds a writer handle, SQLite's lock /
+        // WAL state can leak into the next scan and surface as a confusing
+        // disk I/O error on the very first INSERT.
+        if wasCurrent { app.handleDeletedCurrentScan() }
+        let store = ScanStore()
+        store.deleteSnapshot(snap.url)
+        snapshots.removeAll { $0.id == snap.id }
+        app.refreshRecentScans()
+    }
+
+    private func performClearAll() {
+        let hadCurrent = app.currentScanDatabaseURL != nil
+        // Same ordering rule as performDelete above.
+        if hadCurrent { app.handleDeletedCurrentScan() }
+        let store = ScanStore()
+        store.clearAllSnapshots()
+        snapshots = []
+        app.refreshRecentScans()
     }
 }

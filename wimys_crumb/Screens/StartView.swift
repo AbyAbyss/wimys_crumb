@@ -105,6 +105,49 @@ struct StartView: View {
         if let target { app.startScan(volume: target) }
     }
 
+    // MARK: - Last scans row
+
+    /// One row in the "Last scans" list. Clicking loads that scan's database
+    /// and routes to Overview. The currently-loaded scan gets a "viewing"
+    /// pill and an explicit "Continue →" affordance so the user can get back
+    /// to it after accidentally tapping the crumb logo.
+    private func recentScanRow(_ scan: RecentScan) -> some View {
+        let isCurrent = app.currentScanDatabaseURL == scan.id
+        return Button(action: { app.loadScan(from: scan.id) }) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 6) {
+                        Text(scan.volumeName)
+                            .font(Theme.body(12, weight: isCurrent ? .semibold : .regular))
+                            .foregroundStyle(Color.cInk)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        if isCurrent {
+                            Pill(text: "viewing", color: .cCoral, soft: .cCoralSoft)
+                        }
+                    }
+                    if let used = scan.totalUsed {
+                        Text("\(Fmt.bytes(used)) used")
+                            .font(Theme.body(10))
+                            .foregroundStyle(Color.cInk3)
+                    }
+                }
+                Spacer()
+                Text(isCurrent ? "Continue →" : Fmt.relative(scan.startedAt))
+                    .font(Theme.body(12, weight: isCurrent ? .semibold : .regular))
+                    .foregroundStyle(isCurrent ? Color.cCoral : Color.cInk2)
+            }
+            .padding(.vertical, 7)
+            .padding(.horizontal, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isCurrent ? Color.cCoralSoft.opacity(0.4) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Drives card
 
     private var drivesCard: some View {
@@ -149,19 +192,7 @@ struct StartView: View {
 
                     VStack(spacing: 0) {
                         ForEach(app.recentScans) { scan in
-                            Button(action: { /* Phase 4: load this snapshot */ }) {
-                                HStack {
-                                    Text(scan.volumeName)
-                                        .font(Theme.body(12))
-                                        .foregroundStyle(Color.cInk)
-                                    Spacer()
-                                    Text(Fmt.relative(scan.startedAt))
-                                        .font(Theme.body(12))
-                                        .foregroundStyle(Color.cInk2)
-                                }
-                                .padding(.vertical, 7)
-                            }
-                            .buttonStyle(.plain)
+                            recentScanRow(scan)
                         }
                     }
                 }

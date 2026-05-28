@@ -114,7 +114,7 @@ how many folders were unreadable.
 | **Groups** | Every directory name (node_modules, .venv, …) totalled across the disk. Bubble chart hero + expandable list. |
 | **File types** | Stacked-bar hero + per-category cards + the heaviest files in the focused category. |
 | **History** | Disk usage chart over time + the growers/shrinkers diff between your two latest scans. |
-| **Settings** | Safety toggles, protected paths, scheduled scans, JSON export, about. |
+| **Settings** | Safety toggles, protected paths, scheduled scans, Detection (read-only group catalog + large-file threshold), Snapshots (browse and delete past scan databases, or clear all), JSON export, about. |
 
 ## Releasing
 
@@ -141,7 +141,6 @@ placeholder where those steps will land.
 - Background scheduled scans via a `launchd` agent
 - Bundled fonts (Bricolage Grotesque + Geist + Geist Mono) — drop the .ttf
   files into `wimys_crumb/Resources/Fonts/`
-- App icon in the asset catalog
 
 ## License
 

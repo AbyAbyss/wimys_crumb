@@ -230,9 +230,15 @@ struct GroupsView: View {
     }
 
     private var instancesList: some View {
-        VStack(spacing: 0) {
-            ForEach(app.groupsInstances) { row in
-                instanceRow(row)
+        // Pre-compute the max size once per render so each instance row
+        // doesn't re-read app.groupsInstances.first (which would re-render).
+        let maxSize = Double(app.groupsInstances.first?.totalSize ?? 1)
+        return VStack(alignment: .leading, spacing: 0) {
+            selectionBar
+            LazyVStack(spacing: 0) {
+                ForEach(app.groupsInstances) { row in
+                    instanceRow(row, maxSize: maxSize)
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -240,13 +246,64 @@ struct GroupsView: View {
         .padding(.leading, 48)
     }
 
-    private func instanceRow(_ row: DirRow) -> some View {
+    /// Header above the lazy list with bulk-select actions.
+    /// Plan §8.5 footer's bulk delete pairs naturally with this.
+    private var selectionBar: some View {
+        let total = app.groupsInstances.count
+        let selected = app.groupsSelection.count
+        let staleCount = app.groupsInstances.reduce(into: 0) { acc, row in
+            if let m = row.mtime,
+               -m.timeIntervalSinceNow / 86_400.0 > 180 {
+                acc += 1
+            }
+        }
+        return HStack(spacing: 8) {
+            Text("\(selected) of \(total) selected")
+                .font(Theme.body(11, weight: .semibold))
+                .foregroundStyle(Color.cInk2)
+            Spacer()
+            smallButton(label: "Select all", icon: .check) {
+                app.selectAllInExpandedGroup()
+            }
+            if staleCount > 0 {
+                smallButton(label: "Stale only (\(staleCount))", icon: .filter) {
+                    app.selectStaleInExpandedGroup()
+                }
+            }
+            if selected > 0 {
+                smallButton(label: "Clear", icon: .x) {
+                    app.clearGroupSelection()
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+    }
+
+    private func smallButton(label: String, icon: AppIcon, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                IconView(icon: icon, size: 10)
+                Text(label)
+                    .font(Theme.body(11, weight: .semibold))
+            }
+            .foregroundStyle(Color.cInk)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(Color.cPanel))
+            .overlay(Capsule().strokeBorder(Color.cLine, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func instanceRow(_ row: DirRow, maxSize: Double) -> some View {
         let selected = app.groupsSelection.contains(row.id)
         let stale = (row.mtime.map { -$0.timeIntervalSinceNow / 86400.0 } ?? 0) > 180
-        let maxSize = Double(app.groupsInstances.first?.totalSize ?? 1)
         let frac = maxSize > 0 ? Double(row.totalSize) / maxSize : 0
-        let resolver = app.pathResolver
-        let displayPath = resolver?.fullPath(of: row.id) ?? row.name
+        // Use the pre-resolved path (populated off-main on expand). Falls back
+        // to the bare folder name during the brief window before the resolver
+        // task finishes — better than blocking each row on a SQL walk.
+        let displayPath = app.groupsInstancePaths[row.id] ?? row.name
 
         return HStack(spacing: 10) {
             Toggle("", isOn: Binding(
