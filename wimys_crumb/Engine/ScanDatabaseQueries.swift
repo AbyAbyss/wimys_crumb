@@ -249,47 +249,62 @@ extension ScanDatabase {
                         """, arguments: [subtreeSize, subtreeCount, ancestorId])
                 }
 
-                // Collect every dir id in the subtree (incl. dirId itself).
-                let subtreeIds: [Int64] = try Int64.fetchAll(db, sql: """
+                // The subtree can be tens of thousands of rows (Rust
+                // `target/` is the canonical case). Materializing the
+                // id list and binding it via `IN (?, ?, …)` blows past
+                // SQLITE_MAX_VARIABLE_NUMBER (default ~32K) and the whole
+                // transaction rolls back silently. Use the recursive CTE
+                // INSIDE each statement instead — one bound parameter
+                // (the root dir id) regardless of subtree size.
+
+                // 1. file_type_totals delta — aggregate large_files within
+                //    the subtree by category, then subtract per category.
+                let typeRows = try Row.fetchAll(db, sql: """
                     WITH RECURSIVE subtree(id) AS (
                       SELECT ?
                       UNION ALL
                       SELECT d.id FROM dirs d JOIN subtree s ON d.parent_id = s.id
                     )
-                    SELECT id FROM subtree;
+                    SELECT file_type,
+                           COUNT(*) AS c,
+                           COALESCE(SUM(size), 0) AS s
+                      FROM large_files
+                     WHERE dir_id IN (SELECT id FROM subtree)
+                     GROUP BY file_type;
+                    """, arguments: [dirId])
+                for row in typeRows {
+                    let type: Int = row["file_type"]
+                    let cnt: Int64 = row["c"]
+                    let sz: Int64 = row["s"]
+                    try db.execute(sql: """
+                        UPDATE file_type_totals
+                           SET total_size = MAX(0, total_size - ?),
+                               file_count = MAX(0, file_count - ?)
+                         WHERE file_type = ?;
+                        """, arguments: [sz, cnt, type])
+                }
+
+                // 2. Delete large_files for the subtree.
+                try db.execute(sql: """
+                    WITH RECURSIVE subtree(id) AS (
+                      SELECT ?
+                      UNION ALL
+                      SELECT d.id FROM dirs d JOIN subtree s ON d.parent_id = s.id
+                    )
+                    DELETE FROM large_files
+                     WHERE dir_id IN (SELECT id FROM subtree);
                     """, arguments: [dirId])
 
-                if !subtreeIds.isEmpty {
-                    let placeholders = Array(repeating: "?",
-                                             count: subtreeIds.count)
-                        .joined(separator: ",")
-                    // file_type_totals delta for any large_files in the subtree.
-                    let typeRows = try Row.fetchAll(db, sql: """
-                        SELECT file_type,
-                               COUNT(*) AS c,
-                               COALESCE(SUM(size), 0) AS s
-                          FROM large_files
-                         WHERE dir_id IN (\(placeholders))
-                         GROUP BY file_type;
-                        """, arguments: StatementArguments(subtreeIds))
-                    for row in typeRows {
-                        let type: Int = row["file_type"]
-                        let cnt: Int64 = row["c"]
-                        let sz: Int64 = row["s"]
-                        try db.execute(sql: """
-                            UPDATE file_type_totals
-                               SET total_size = MAX(0, total_size - ?),
-                                   file_count = MAX(0, file_count - ?)
-                             WHERE file_type = ?;
-                            """, arguments: [sz, cnt, type])
-                    }
-                    try db.execute(sql:
-                        "DELETE FROM large_files WHERE dir_id IN (\(placeholders));",
-                        arguments: StatementArguments(subtreeIds))
-                    try db.execute(sql:
-                        "DELETE FROM dirs WHERE id IN (\(placeholders));",
-                        arguments: StatementArguments(subtreeIds))
-                }
+                // 3. Delete dirs for the subtree.
+                try db.execute(sql: """
+                    WITH RECURSIVE subtree(id) AS (
+                      SELECT ?
+                      UNION ALL
+                      SELECT d.id FROM dirs d JOIN subtree s ON d.parent_id = s.id
+                    )
+                    DELETE FROM dirs
+                     WHERE id IN (SELECT id FROM subtree);
+                    """, arguments: [dirId])
             }
 
             // ---- Individual files ----

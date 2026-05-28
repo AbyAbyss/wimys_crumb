@@ -345,6 +345,7 @@ final class AppModel {
         // re-query doesn't bring deleted rows back. Run synchronously
         // since it's a small write inside an existing open DB and the
         // UI is already mid-transition to its post-delete state.
+        var patchFailed = false
         if !outcome.removed.isEmpty, let db = currentDb {
             let removedDirRows = outcome.removed.filter { !$0.isFile }
             let removedFileRows = outcome.removed.filter { $0.isFile }
@@ -357,6 +358,7 @@ final class AppModel {
                 try db.patchAfterDelete(dirIds: dirIds, files: files)
             } catch {
                 NSLog("patchAfterDelete failed: \(error)")
+                patchFailed = true
             }
         }
 
@@ -394,9 +396,20 @@ final class AppModel {
             overviewStats.free = overviewStats.free + outcome.freedBytes
         }
 
+        // Refresh the cached Overview/groups so the next navigation
+        // sees the patched DB values, not the snapshots from before
+        // the delete.
+        if !outcome.removed.isEmpty {
+            loadOverview()
+            loadGroups()
+        }
+
         let n = outcome.removed.count
         let freed = Fmt.bytes(outcome.freedBytes)
-        if n == 0 && !outcome.skipped.isEmpty {
+        if patchFailed {
+            showToast("Database patch failed — totals may look stale. Rescan to fix.",
+                      duration: 8)
+        } else if n == 0 && !outcome.skipped.isEmpty {
             showToast("Nothing deleted — all targets were protected.")
         } else if deleteKind == .trash {
             let trashURLs = outcome.trashURLs

@@ -411,14 +411,14 @@ private struct ExportPanel: View {
 
         struct Export: Encodable {
             struct Folder: Encodable { let name: String; let totalBytes: Int64; let items: Int64 }
-            struct Type: Encodable { let category: String; let totalBytes: Int64; let files: Int64 }
+            struct TypeRow: Encodable { let category: String; let totalBytes: Int64; let files: Int64 }
             struct Suggestion: Encodable { let title: String; let detail: String; let saveBytes: Int64 }
             let exportedAt: Date
             let volume: String?
             let used: Int64
             let free: Int64
             let topFolders: [Folder]
-            let byFileType: [Type]
+            let byFileType: [TypeRow]
             let suggestions: [Suggestion]
         }
 
@@ -432,8 +432,8 @@ private struct ExportPanel: View {
                               items: $0.descendantFileCount)
             },
             byFileType: app.overviewTypes.map {
-                Export.Type(category: $0.type.displayName,
-                            totalBytes: $0.totalSize, files: $0.fileCount)
+                Export.TypeRow(category: $0.type.displayName,
+                               totalBytes: $0.totalSize, files: $0.fileCount)
             },
             suggestions: app.suggestions.map {
                 Export.Suggestion(title: $0.title, detail: $0.detail,
@@ -446,7 +446,7 @@ private struct ExportPanel: View {
         encoder.dateEncodingStrategy = .iso8601
         do {
             let data = try encoder.encode(payload)
-            try data.write(to: url, options: .atomic)
+            try data.write(to: url, options: [Data.WritingOptions.atomic])
             app.showToast("Exported to \(url.lastPathComponent)")
         } catch {
             app.showToast("Export failed: \(error.localizedDescription)")

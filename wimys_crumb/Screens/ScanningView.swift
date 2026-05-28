@@ -60,7 +60,7 @@ struct ScanningView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         ProgressBarView(fraction: app.scanProgress, color: .cCoral, height: 10)
                         HStack {
-                            Text("\(app.filesScanned.formatted(.number.notation(.compactName))) files")
+                            Text("\(app.filesScanned.formatted(.number)) files")
                                 .font(Theme.body(12))
                                 .foregroundStyle(Color.cInk2)
                             Spacer()
