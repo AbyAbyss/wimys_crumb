@@ -20,7 +20,8 @@
   <a href="#features">Features</a> &nbsp;·&nbsp;
   <a href="#a-look-inside">A look inside</a> &nbsp;·&nbsp;
   <a href="#how-it-works">How it works</a> &nbsp;·&nbsp;
-  <a href="#build-and-run">Build</a> &nbsp;·&nbsp;
+  <a href="#download">Download</a> &nbsp;·&nbsp;
+  <a href="#build-from-source">Build</a> &nbsp;·&nbsp;
   <a href="#releasing">Releasing</a> &nbsp;·&nbsp;
   <a href="#roadmap">Roadmap</a>
 </p>
@@ -72,19 +73,36 @@ the SQLite tree so the next re-query reflects reality without a full rescan.
 The full design is in
 [`wimys_crumb-implementation-plan.md`](wimys_crumb-implementation-plan.md).
 
+## Download
+
+Grab the latest `wimys_crumb-<version>.dmg` from the [**Releases**](https://github.com/AbyAbyss/wimys_crumb/releases/latest) page, open it, and drag **wimys_crumb** into Applications. It needs macOS 14 (Sonoma) or later.
+
+## First launch
+
+macOS will say it can't verify wimys_crumb (free side project, not notarized).
+
+Open **System Settings → Privacy & Security** and click **Open Anyway**, or run in Terminal:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/wimys_crumb.app
+```
+
+For the full-disk scan to see everything, also grant **Full Disk Access** (System Settings → Privacy & Security → Full Disk Access).
+
 ## Requirements
 
 - macOS 14 (Sonoma) or later
 - Xcode 15 or later
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) — `brew install xcodegen`
 
-## Build and run
+## Build from source
 
 The Xcode project is generated from `project.yml`, so it isn't committed:
 
 ```sh
-xcodegen generate
-open wimys_crumb.xcodeproj
+brew install xcodegen
+git clone https://github.com/AbyAbyss/wimys_crumb.git
+cd wimys_crumb && xcodegen generate && open wimys_crumb.xcodeproj
 ```
 
 Press `⌘R` to run. The app launches to the Start screen and lists your
